@@ -12,12 +12,19 @@ export const connectSocket = (sessionId, password, onAuthenticated, onTextUpdate
     transports: ['websocket', 'polling']
   });
 
+  let isFirstConnect = true; // ← pehli baar hi onAuthenticated call karo
+
   socket.on('connect', () => {
-    console.log('✅ Socket connected, emitting authenticate...');
+    console.log('✅ Socket connected, authenticating...');
     socket.emit('authenticate', { sessionId, password }, (response) => {
       console.log('🔐 Auth response:', response);
       if (response?.success) {
-        onAuthenticated(response.text || '', response.files || []);
+        if (isFirstConnect) {
+          // Sirf pehli baar initial text/files set karo
+          onAuthenticated(response.text || '', response.files || []);
+          isFirstConnect = false;
+        }
+        // Reconnect pe sirf room join hota hai, text overwrite nahi
       } else {
         console.error('Auth failed:', response?.error);
       }
@@ -25,10 +32,12 @@ export const connectSocket = (sessionId, password, onAuthenticated, onTextUpdate
   });
 
   socket.on('connect_error', (err) => console.error('❌ Socket error:', err.message));
+
   socket.on('text-updated', ({ text }) => {
-    console.log('📝 text-updated RECEIVED:', text);
+    console.log('📝 text-updated received:', text.slice(0, 30));
     onTextUpdate(text);
   });
+
   socket.on('new-file', ({ file }) => onNewFile(file));
   socket.on('file-deleted', ({ fileId }) => onFileDeleted(fileId));
 
@@ -37,10 +46,9 @@ export const connectSocket = (sessionId, password, onAuthenticated, onTextUpdate
 
 export const updateText = (sessionId, text) => {
   if (socket && socket.connected) {
-    console.log('📤 Emitting update-text:', text.slice(0, 30));
     socket.emit('update-text', { sessionId, text });
   } else {
-    console.warn('Socket not connected');
+    console.warn('⚠️ Socket not connected, update skipped');
   }
 };
 

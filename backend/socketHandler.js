@@ -14,7 +14,6 @@ export function setupSocketHandlers(io) {
 
       currentSessionId = sessionId;
       socket.join(sessionId);
-      console.log(`✅ Client ${socket.id} joined room ${sessionId}`);
 
       callback({
         success: true,
@@ -26,12 +25,13 @@ export function setupSocketHandlers(io) {
     socket.on('update-text', ({ sessionId, text }) => {
       if (!currentSessionId || currentSessionId !== sessionId) return;
       const session = sessions.get(sessionId);
-      if (session && session.expiresAt > Date.now()) {
-        session.textContent = text;
-        console.log(`📝 Broadcasting text to room ${sessionId}:`, text.slice(0, 30));
-        // Send to EVERYONE except the sender
-        socket.to(sessionId).emit('text-updated', { text });
-      }
+      if (!session || session.expiresAt <= Date.now()) return;
+
+      // Save karo server pe
+      session.textContent = text;
+
+      // Sirf doosron ko bhejo, sender ko nahi
+      socket.to(sessionId).emit('text-updated', { text });
     });
 
     socket.on('disconnect', () => {
