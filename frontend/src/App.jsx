@@ -231,7 +231,7 @@ export default function App() {
             </div>
           </div>
           <div className="glass-card" style={{ padding: '4px 20px' }}>
-            {[['Author','Shailendra Meghwal & Jatin Jangra'],['Version','2026 · v2.0'],['License','All Rights Reserved'],['Protocol','WebSocket + REST']].map(([k,v]) => (
+            {[['Author','Shailendra Meghwal'],['Version','2026 · v1.0'],['License','All Rights Reserved'],['Protocol','WebSocket + REST']].map(([k,v]) => (
               <div key={k} className="meta-row">
                 <span style={{ fontFamily: 'var(--font-m)', fontSize: 9, color: 'var(--t3)', letterSpacing: 1.5, textTransform: 'uppercase' }}>{k}</span>
                 <span style={{ fontFamily: 'var(--font-d)', fontSize: 13, fontWeight: 600, color: 'var(--t1)' }}>{v}</span>
