@@ -1,14 +1,13 @@
-// frontend/src/components/SharedText.jsx
 import React, { useState, useRef, useEffect } from 'react';
 
 export default function SharedText({ text: remoteProp, onChange }) {
   const [localText, setLocalText] = useState(remoteProp || '');
-  const [syncing, setSyncing] = useState(false);
-  const timeoutRef = useRef(null);
-  const typingRef = useRef(false); // user type kar raha hai?
+  const [syncing, setSyncing]     = useState(false);
+  const debounceRef               = useRef(null);
+  const typingRef                 = useRef(false);
 
   useEffect(() => {
-    // Remote update aaya — sirf tab apply karo jab user type nahi kar raha
+    // Remote se update aaya — sirf tab apply karo jab user type nahi kar raha
     if (!typingRef.current) {
       setLocalText(remoteProp || '');
     }
@@ -20,18 +19,17 @@ export default function SharedText({ text: remoteProp, onChange }) {
     setSyncing(true);
     typingRef.current = true;
 
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
       onChange(value);
       setSyncing(false);
-      // Thodi der baad typing flag hatao taaki remote updates aa sakein
-      setTimeout(() => { typingRef.current = false; }, 1000);
+      // 1.5 sec baad typing flag hatao
+      setTimeout(() => { typingRef.current = false; }, 1500);
     }, 500);
   };
 
   const handleCopy = () => {
-    if (!localText) return;
-    navigator.clipboard.writeText(localText);
+    if (localText) navigator.clipboard.writeText(localText);
   };
 
   const handleClear = () => {

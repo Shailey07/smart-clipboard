@@ -1,40 +1,50 @@
-// frontend/src/socket.js
 import { io } from 'socket.io-client';
 
 let socket = null;
 
 export const connectSocket = (sessionId, password, onAuthenticated, onTextUpdate, onNewFile, onFileDeleted) => {
-  if (socket) socket.disconnect();
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
 
   socket = io('/', {
     autoConnect: true,
     reconnection: true,
-    transports: ['websocket', 'polling']
+    reconnectionDelay: 2000,
+    reconnectionAttempts: 10,
+    transports: ['websocket', 'polling'],
   });
 
-  let isFirstConnect = true; // ← pehli baar hi onAuthenticated call karo
+  let authenticated = false;
 
-  socket.on('connect', () => {
-    console.log('✅ Socket connected, authenticating...');
+  const doAuth = () => {
     socket.emit('authenticate', { sessionId, password }, (response) => {
-      console.log('🔐 Auth response:', response);
       if (response?.success) {
-        if (isFirstConnect) {
-          // Sirf pehli baar initial text/files set karo
+        if (!authenticated) {
+          authenticated = true;
           onAuthenticated(response.text || '', response.files || []);
-          isFirstConnect = false;
         }
-        // Reconnect pe sirf room join hota hai, text overwrite nahi
+        // reconnect pe sirf room join hota hai — text overwrite nahi
       } else {
         console.error('Auth failed:', response?.error);
       }
     });
+  };
+
+  socket.on('connect', () => {
+    console.log('✅ Socket connected');
+    doAuth();
+  });
+
+  socket.on('reconnect', () => {
+    console.log('🔄 Socket reconnected');
+    doAuth();
   });
 
   socket.on('connect_error', (err) => console.error('❌ Socket error:', err.message));
 
   socket.on('text-updated', ({ text }) => {
-    console.log('📝 text-updated received:', text.slice(0, 30));
     onTextUpdate(text);
   });
 
@@ -45,10 +55,8 @@ export const connectSocket = (sessionId, password, onAuthenticated, onTextUpdate
 };
 
 export const updateText = (sessionId, text) => {
-  if (socket && socket.connected) {
+  if (socket?.connected) {
     socket.emit('update-text', { sessionId, text });
-  } else {
-    console.warn('⚠️ Socket not connected, update skipped');
   }
 };
 

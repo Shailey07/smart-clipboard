@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useCallback } from 'react';
 import CreateSession from './components/CreateSession';
 import JoinSession from './components/JoinSession';
 import ClipboardView from './components/ClipboardView';
@@ -26,12 +26,12 @@ const LogoIcon = () => (<svg width="18" height="18" viewBox="0 0 18 18" fill="no
 const WireframeDeco = () => (<><div className="wireframe-deco" style={{ top: -40, right: -60, width: 280, height: 280 }}><svg viewBox="0 0 280 280" fill="none"><polygon points="140,8 272,72 272,208 140,272 8,208 8,72" stroke="#6c63ff" strokeWidth="0.8" fill="none"/><polygon points="140,36 244,90 244,190 140,244 36,190 36,90" stroke="#6c63ff" strokeWidth="0.5" fill="none"/><line x1="140" y1="8" x2="140" y2="272" stroke="#6c63ff" strokeWidth="0.3"/><line x1="8" y1="72" x2="272" y2="208" stroke="#6c63ff" strokeWidth="0.3"/><line x1="8" y1="208" x2="272" y2="72" stroke="#6c63ff" strokeWidth="0.3"/></svg></div><div className="wireframe-deco" style={{ bottom: -80, left: -50, width: 240, height: 240 }}><svg viewBox="0 0 240 240" fill="none"><rect x="16" y="16" width="208" height="208" stroke="#3da9fc" strokeWidth="0.7" fill="none"/><rect x="48" y="48" width="144" height="144" stroke="#3da9fc" strokeWidth="0.4" fill="none" transform="rotate(15 120 120)"/><circle cx="120" cy="120" r="72" stroke="#3da9fc" strokeWidth="0.4" fill="none" strokeDasharray="4 8"/></svg></div></>);
 
 export default function App() {
-  const [sessions, setSessions]               = useState([]);
+  const [sessions, setSessions]             = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [activeTab, setActiveTab]             = useState('sessions');
-  const [pendingSession, setPendingSession]   = useState(null);
+  const [activeTab, setActiveTab]           = useState('sessions');
+  const [pendingSession, setPendingSession] = useState(null);
 
-  const addSessionToList = (sessionData, isCreator) => {
+  const addSessionToList = useCallback((sessionData, isCreator) => {
     const newId = Date.now().toString();
     setSessions(prev => [...prev, {
       id: newId,
@@ -45,42 +45,54 @@ export default function App() {
     }]);
     setActiveSessionId(newId);
     setActiveTab('sessions');
-  };
+  }, []);
 
-  const addSession = (sessionData, isCreator) => {
+  const addSession = useCallback((sessionData, isCreator) => {
     if (isCreator) {
       setPendingSession(sessionData);
     } else {
       addSessionToList(sessionData, false);
     }
-  };
+  }, [addSessionToList]);
 
-  const handlePendingClose = () => {
-    if (pendingSession) {
-      addSessionToList(pendingSession, true);
-      setPendingSession(null);
-    }
-  };
+  const handlePendingClose = useCallback(() => {
+    setPendingSession(prev => {
+      if (prev) addSessionToList(prev, true);
+      return null;
+    });
+  }, [addSessionToList]);
 
-  const removeSession = (sessionId) => {
+  const removeSession = useCallback((sessionId) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId));
-    if (activeSessionId === sessionId) {
-      const remaining = sessions.filter(s => s.id !== sessionId);
-      setActiveSessionId(remaining.length ? remaining[0].id : null);
-    }
-  };
+    setActiveSessionId(prev => {
+      if (prev !== sessionId) return prev;
+      return null;
+    });
+  }, []);
 
-  const updateSessionActivity = (sessionId) => {
+  const updateSessionActivity = useCallback((sessionId) => {
     setSessions(prev => prev.map(s =>
       s.id === sessionId ? {
         ...s,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        unread: s.id !== activeSessionId ? s.unread + 1 : 0,
+        unread: s.id !== sessionId ? s.unread + 1 : 0,
       } : s
     ));
-  };
+  }, []);
 
   const activeSession = sessions.find(s => s.id === activeSessionId);
+
+  // Stable callbacks for ClipboardView — recreate nahi honge
+  const handleLeave = useCallback(() => {
+    if (activeSession) {
+      removeSession(activeSession.id);
+      setActiveTab('sessions');
+    }
+  }, [activeSession?.id, removeSession]);
+
+  const handleActivity = useCallback(() => {
+    if (activeSession) updateSessionActivity(activeSession.id);
+  }, [activeSession?.id, updateSessionActivity]);
 
   const renderContent = () => {
     if (activeTab === 'sessions') {
@@ -126,9 +138,10 @@ export default function App() {
     if (activeTab === 'chat' && activeSession) {
       return (
         <ClipboardView
+          key={activeSession.id}
           session={activeSession.data}
-          onLeave={() => { removeSession(activeSession.id); setActiveTab('sessions'); }}
-          onActivity={() => updateSessionActivity(activeSession.id)}
+          onLeave={handleLeave}
+          onActivity={handleActivity}
         />
       );
     }
@@ -282,7 +295,6 @@ export default function App() {
           })}
         </nav>
       </div>
-
       {pendingSession && (
         <QRCodeModal
           code={pendingSession.code}
